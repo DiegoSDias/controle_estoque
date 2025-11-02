@@ -25,10 +25,8 @@ function App() {
   const [produtos, setProdutos] = useState([]);
   const [vendas, setVendas] = useState([]);
   
-  // 3. Efeito para buscar TODOS os dados da API quando o app carregar
-  useEffect(() => {
-    // Função genérica para buscar dados de um endpoint
-    const fetchData = async (endpoint, setter) => {
+  // Função genérica para buscar dados de um endpoint
+  const fetchData = async (endpoint, setter) => {
       try {
         const response = await fetch(`${API_URL}/${endpoint}`);
         const data = await response.json();
@@ -37,7 +35,8 @@ function App() {
         console.error(`Erro ao buscar ${endpoint}:`, error);
       }
     };
-
+  // 3. Efeito para buscar TODOS os dados da API quando o app carregar
+  useEffect(() => {
     // Chamamos a função para cada um dos nossos endpoints
     fetchData('fornecedores', setFornecedores);
     fetchData('produtos', setProdutos);

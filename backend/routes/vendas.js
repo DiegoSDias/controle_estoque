@@ -27,7 +27,7 @@ router.post('/', async (req, res) => {
       valor_total += produtoDoBanco.preco_venda * item.quantidade;
     }
 
-    const sqlVenda = 'INSERT INTO Vendas (id_cliente, valor_total) VALUES (?, ?)';
+    const sqlVenda = 'INSERT INTO Vendas (id_cliente, valor_total, data_venda) VALUES (?, ?, NOW())';
     const [resultadoVenda] = await connection.query(sqlVenda, [id_cliente, valor_total]);
     const id_venda_criada = resultadoVenda.insertId;
 

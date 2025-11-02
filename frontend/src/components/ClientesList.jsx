@@ -48,7 +48,7 @@ const ClientesList = ({ clientes, recarregarDados }) => {
           alert(`Erro ao excluir: ${erro.erro}`);
         }
       } catch (error) {
-        alert('Não foi possível conectar à API.');
+        console.log('Não foi possível conectar à API: ', error);
       }
     }
   };
@@ -77,7 +77,7 @@ const ClientesList = ({ clientes, recarregarDados }) => {
         alert(`Erro: ${erro.erro}`);
       }
     } catch (error) {
-      alert('Não foi possível conectar à API.');
+      console.log('Não foi possível conectar à API: ', error);
     }
   };
 
