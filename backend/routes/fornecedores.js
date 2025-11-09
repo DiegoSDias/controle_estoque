@@ -35,15 +35,15 @@ router.get('/:id', (req, res) => {
 
 // POST - Cadastrar fornecedor
 router.post('/', (req, res) => {
-  const { nome_fantasia, razao_social, cnpj, telefone, email } = req.body;
+  const { nome_fantasia, razao_social, cnpj, email, telefone, nome_rua, numero_rua, complemento, bairro, cidade, estado, cep } = req.body;
   
   // Validação básica
   if (!nome_fantasia) {
     return res.status(400).json({ erro: "Nome fantasia é obrigatório" });
   }
   
-  const sql = "INSERT INTO Fornecedores (nome_fantasia, razao_social, cnpj, telefone, email) VALUES (?, ?, ?, ?, ?)";
-  const dados = [nome_fantasia, razao_social, cnpj, telefone, email];
+  const sql = "INSERT INTO Fornecedores (nome_fantasia, razao_social, cnpj, email, telefone, nome_rua, numero_rua, complemento, bairro, cidade, estado, cep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  const dados = [nome_fantasia, razao_social, cnpj, email, telefone, nome_rua, numero_rua, complemento, bairro, cidade, estado, cep];
   
   pool.query(sql, dados, (erro, resultados) => {
     if (erro) {
@@ -63,14 +63,14 @@ router.post('/', (req, res) => {
 // PUT - Atualizar fornecedor
 router.put('/:id', (req, res) => {
   const { id } = req.params;
-  const { nome_fantasia, razao_social, cnpj, telefone, email } = req.body;
+  const { nome_fantasia, razao_social, cnpj, email, telefone, nome_rua, numero_rua, complemento, bairro, cidade, estado, cep } = req.body;
   
   if (!nome_fantasia) {
     return res.status(400).json({ erro: "Nome fantasia é obrigatório" });
   }
   
-  const sql = "UPDATE Fornecedores SET nome_fantasia = ?, razao_social = ?, cnpj = ?, telefone = ?, email = ? WHERE id_fornecedor = ?";
-  const dados = [nome_fantasia, razao_social, cnpj, telefone, email, id];
+  const sql = "UPDATE Fornecedores SET nome_fantasia = ?, razao_social = ?, cnpj = ?, email = ?, telefone = ?, nome_rua = ?, numero_rua = ?, complemento = ?, bairro = ?, cidade = ?, estado = ?, cep = ?  WHERE id_fornecedor = ?";
+  const dados = [nome_fantasia, razao_social, cnpj, email, telefone, nome_rua, numero_rua, complemento, bairro, cidade, estado, cep, id];
   
   pool.query(sql, dados, (erro, resultados) => {
     if (erro) {

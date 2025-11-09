@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Plus, Truck, Edit, Trash2 } from 'lucide-react';
 
 // API_URL para centralizar o endereço do back-end
@@ -13,8 +13,15 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
   const [nomeFantasia, setNomeFantasia] = useState('');
   const [razaoSocial, setRazaoSocial] = useState('');
   const [cnpj, setCnpj] = useState('');
-  const [telefone, setTelefone] = useState('');
   const [email, setEmail] = useState('');
+  const [telefone, setTelefone] = useState('');
+  const [nomeRua, setNomeRua] = useState('');
+  const [numeroRua, setNumeroRua] = useState('');
+  const [complemento, setComplemento] = useState('');
+  const [bairro, setBairro] = useState('');
+  const [cidade, setCidade] = useState('');
+  const [estado, setEstado] = useState('');
+  const [cep, setCep] = useState('');
 
   // --- Funções de Ação ---
 
@@ -25,16 +32,30 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
       setNomeFantasia(fornecedor.nome_fantasia);
       setRazaoSocial(fornecedor.razao_social || '');
       setCnpj(fornecedor.cnpj || '');
-      setTelefone(fornecedor.telefone || '');
       setEmail(fornecedor.email || '');
+      setTelefone(fornecedor.telefone || '');
+      setNomeRua(fornecedor.nome_rua || '');
+      setNumeroRua(fornecedor.numero_rua || '');
+      setComplemento(fornecedor.complemento || '');
+      setBairro(fornecedor.bairro || '');
+      setCidade(fornecedor.cidade || '');
+      setEstado(fornecedor.estado || '');
+      setCep(fornecedor.cep || '');
     } else {
       // Modo Cadastro: limpa o formulário
       setFornecedorEmEdicao(null);
       setNomeFantasia('');
       setRazaoSocial('');
       setCnpj('');
-      setTelefone('');
       setEmail('');
+      setTelefone('');
+      setNomeRua('');
+      setNumeroRua('');
+      setComplemento('');
+      setBairro('');
+      setCidade('');
+      setEstado('');
+      setCep('');
     }
     setIsModalOpen(true);
   };
@@ -55,7 +76,7 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
           alert(`Erro ao excluir: ${erro.erro}`);
         }
       } catch (error) {
-        alert('Não foi possível conectar à API.');
+        console.log('Não foi possível conectar à API: ', error);
       }
     }
   };
@@ -63,7 +84,7 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
   const handleSubmit = async (event) => {
     event.preventDefault();
     
-    const dadosFornecedor = { nome_fantasia: nomeFantasia, razao_social: razaoSocial, cnpj, telefone, email };
+    const dadosFornecedor = { nome_fantasia: nomeFantasia, razao_social: razaoSocial, cnpj, email, telefone, nome_rua: nomeRua, numero_rua:numeroRua, complemento, bairro, cidade, estado, cep };
     const ehEdicao = !!fornecedorEmEdicao;
     const url = ehEdicao ? `${API_URL}/fornecedores/${fornecedorEmEdicao.id_fornecedor}` : `${API_URL}/fornecedores`;
     const method = ehEdicao ? 'PUT' : 'POST';
@@ -84,7 +105,7 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
         alert(`Erro: ${erro.erro}`);
       }
     } catch (error) {
-      alert('Não foi possível conectar à API.');
+      console.log('Não foi possível conectar à API: ', error);
     }
   };
 
@@ -128,12 +149,107 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
             <h2 className="text-2xl font-bold mb-4">{fornecedorEmEdicao ? 'Editar Fornecedor' : 'Novo Fornecedor'}</h2>
             <form onSubmit={handleSubmit}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input value={nomeFantasia} onChange={e => setNomeFantasia(e.target.value)} type="text" placeholder="Nome Fantasia*" required className="p-2 border rounded-md md:col-span-2"/>
-                <input value={razaoSocial} onChange={e => setRazaoSocial(e.target.value)} type="text" placeholder="Razão Social" className="p-2 border rounded-md md:col-span-2"/>
-                <input value={cnpj} onChange={e => setCnpj(e.target.value)} type="text" placeholder="CNPJ" className="p-2 border rounded-md"/>
-                <input value={telefone} onChange={e => setTelefone(e.target.value)} type="text" placeholder="Telefone" className="p-2 border rounded-md"/>
-                <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="E-mail" className="p-2 border rounded-md md:col-span-2"/>
+                {/* Dados principais */}
+                <input
+                  value={nomeFantasia}
+                  onChange={(e) => setNomeFantasia(e.target.value)}
+                  type="text"
+                  placeholder="Nome Fantasia*"
+                  required
+                  className="p-2 border rounded-md md:col-span-2"
+                />
+
+                <input
+                  value={razaoSocial}
+                  onChange={(e) => setRazaoSocial(e.target.value)}
+                  type="text"
+                  placeholder="Razão Social"
+                  className="p-2 border rounded-md md:col-span-2"
+                />
+
+                <input
+                  value={cnpj}
+                  onChange={(e) => setCnpj(e.target.value)}
+                  type="text"
+                  placeholder="CNPJ"
+                  className="p-2 border rounded-md"
+                />
+
+                <input
+                  value={telefone}
+                  onChange={(e) => setTelefone(e.target.value)}
+                  type="text"
+                  placeholder="Telefone"
+                  className="p-2 border rounded-md"
+                />
+
+                <input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  type="email"
+                  placeholder="E-mail"
+                  className="p-2 border rounded-md md:col-span-2"
+                />
+
+                {/* Endereço */}
+                <input
+                  value={nomeRua}
+                  onChange={(e) => setNomeRua(e.target.value)}
+                  type="text"
+                  placeholder="Logradouro (Rua, Avenida, etc.)"
+                  className="p-2 border rounded-md md:col-span-2"
+                />
+
+                <input
+                  value={numeroRua}
+                  onChange={(e) => setNumeroRua(e.target.value)}
+                  type="text"
+                  placeholder="Número"
+                  className="p-2 border rounded-md"
+                />
+
+                <input
+                  value={complemento}
+                  onChange={(e) => setComplemento(e.target.value)}
+                  type="text"
+                  placeholder="Complemento"
+                  className="p-2 border rounded-md"
+                />
+
+                <input
+                  value={bairro}
+                  onChange={(e) => setBairro(e.target.value)}
+                  type="text"
+                  placeholder="Bairro"
+                  className="p-2 border rounded-md"
+                />
+
+                <input
+                  value={cidade}
+                  onChange={(e) => setCidade(e.target.value)}
+                  type="text"
+                  placeholder="Cidade"
+                  className="p-2 border rounded-md"
+                />
+
+                <input
+                  value={estado}
+                  onChange={(e) => setEstado(e.target.value)}
+                  type="text"
+                  placeholder="Estado (UF)"
+                  maxLength={2}
+                  className="p-2 border rounded-md"
+                />
+
+                <input
+                  value={cep}
+                  onChange={(e) => setCep(e.target.value)}
+                  type="text"
+                  placeholder="CEP"
+                  className="p-2 border rounded-md"
+                />
               </div>
+
               <div className="flex justify-end space-x-4 mt-6">
                 <button type="button" onClick={fecharModal} className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg">Cancelar</button>
                 <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Salvar</button>

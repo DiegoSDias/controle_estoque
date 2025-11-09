@@ -51,15 +51,24 @@ function App() {
         // Passamos todos os dados que o Dashboard precisa como "props"
         return <Dashboard produtos={produtos} fornecedores={fornecedores} clientes={clientes} vendas={vendas} />;
       case 'produtos':
-  return <ProdutosList 
-            produtos={produtos} 
-            fornecedores={fornecedores} 
-            recarregarDados={() => fetchData('produtos', setProdutos)} 
-         />;
+      return <ProdutosList 
+                produtos={produtos} 
+                fornecedores={fornecedores} 
+                recarregarDados={() => fetchData('produtos', setProdutos)} 
+            />;
       case 'fornecedores':
-        return <FornecedoresList fornecedores={fornecedores} />;
+        return (
+          <FornecedoresList
+            fornecedores={fornecedores}
+            recarregarDados={() => fetchData('fornecedores', setFornecedores)}
+          />
+        );
       case 'clientes':
-        return <ClientesList clientes={clientes} />;
+        return (<ClientesList 
+          clientes={clientes} 
+          recarregarDados={() => fetchData('clientes', setFornecedores)}
+        />
+      );
      // ... dentro da função renderContent() no App.jsx
 
 case 'vendas':

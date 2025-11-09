@@ -43,14 +43,14 @@ router.get('/:id', (req, res) => {
 
 // POST - Cadastrar produto
 router.post('/', (req, res) => {
-  const { nome_produto, descricao, preco_venda, quantidade_estoque, id_fornecedor } = req.body;
+  const { nome_produto, descricao, preco_venda, quantidade_estoque, quant_max, quant_min, data_validade, id_fornecedor } = req.body;
   
   if (!nome_produto || !preco_venda) {
     return res.status(400).json({ erro: "Nome do produto e preço de venda são obrigatórios" });
   }
   
-  const sql = "INSERT INTO Produtos (nome_produto, descricao, preco_venda, quantidade_estoque, id_fornecedor) VALUES (?, ?, ?, ?, ?)";
-  const dados = [nome_produto, descricao, preco_venda, quantidade_estoque || 0, id_fornecedor];
+  const sql = "INSERT INTO Produtos (nome_produto, descricao, preco_venda, quantidade_estoque, quant_max, quant_min, data_validade, id_fornecedor) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+  const dados = [nome_produto, descricao, preco_venda, quantidade_estoque || 0, quant_max, quant_min, data_validade, id_fornecedor];
   
   pool.query(sql, dados, (erro, resultados) => {
     if (erro) {
@@ -67,6 +67,7 @@ router.post('/', (req, res) => {
 // PUT - Atualizar produto
 router.put('/:id', (req, res) => {
   const { id } = req.params;
+  console.log(req.body)
   const { nome_produto, descricao, preco_venda, quantidade_estoque, id_fornecedor } = req.body;
   
   if (!nome_produto || !preco_venda) {

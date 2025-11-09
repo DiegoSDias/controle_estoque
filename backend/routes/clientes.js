@@ -33,14 +33,14 @@ router.get('/:id', (req, res) => {
 
 // POST - Cadastrar cliente
 router.post('/', (req, res) => {
-  const { nome_cliente, cpf, telefone, email } = req.body;
+  const { nome_cliente, cpf, email, telefone, data_nascimento, nome_rua, numero_rua, complemento, bairro, cidade, estado, cep } = req.body;
   
   if (!nome_cliente) {
     return res.status(400).json({ erro: "Nome do cliente é obrigatório" });
   }
   
-  const sql = "INSERT INTO Clientes (nome_cliente, cpf, telefone, email) VALUES (?, ?, ?, ?)";
-  const dados = [nome_cliente, cpf, telefone, email];
+  const sql = "INSERT INTO Clientes (nome_cliente, cpf, email, telefone, data_nascimento, nome_rua, numero_rua, complemento, bairro, cidade, estado, cep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  const dados = [nome_cliente, cpf, email, telefone, data_nascimento, nome_rua, numero_rua, complemento, bairro, cidade, estado, cep];
   
   pool.query(sql, dados, (erro, resultados) => {
     if (erro) {
@@ -60,14 +60,14 @@ router.post('/', (req, res) => {
 // PUT - Atualizar cliente
 router.put('/:id', (req, res) => {
   const { id } = req.params;
-  const { nome_cliente, cpf, telefone, email } = req.body;
+  const { nome_cliente, cpf, email, telefone, data_nascimento, nome_rua, numero_rua, complemento, bairro, cidade, estado, cep } = req.body;
   
   if (!nome_cliente) {
     return res.status(400).json({ erro: "Nome do cliente é obrigatório" });
   }
   
-  const sql = "UPDATE Clientes SET nome_cliente = ?, cpf = ?, telefone = ?, email = ? WHERE id_cliente = ?";
-  const dados = [nome_cliente, cpf, telefone, email, id];
+  const sql = "UPDATE Clientes SET nome_cliente = ?, cpf = ?, email = ?, telefone = ?, data_nascimento = ?, nome_rua = ?, numero_rua = ?, complemento = ?, bairro = ?, cidade = ?, estado = ?, cep = ? WHERE id_cliente = ?";
+  const dados = [nome_cliente, cpf, email, telefone, data_nascimento, nome_rua, numero_rua, complemento, bairro, cidade, estado, cep, id];
   
   pool.query(sql, dados, (erro, resultados) => {
     if (erro) {

@@ -13,6 +13,9 @@ const ProdutosList = ({ produtos, fornecedores, recarregarDados }) => {
   const [descricao, setDescricao] = useState('');
   const [precoVenda, setPrecoVenda] = useState('');
   const [quantidadeEstoque, setQuantidadeEstoque] = useState('');
+  const [quantMax, setQuantMax] = useState('');
+  const [quantMin, setQuantMin] = useState('');
+  const [dataValidade, setDataValidade] = useState('');
   const [idFornecedor, setIdFornecedor] = useState('');
 
   // --- Funções de Ação ---
@@ -23,6 +26,9 @@ const ProdutosList = ({ produtos, fornecedores, recarregarDados }) => {
       setDescricao(produto.descricao || '');
       setPrecoVenda(produto.preco_venda);
       setQuantidadeEstoque(produto.quantidade_estoque);
+      setQuantMax(produto.quant_max);
+      setQuantMin(produto.quant_min);
+      setDataValidade(formatDateInput(produto.data_validade));
       setIdFornecedor(produto.id_fornecedor || '');
     } else {
       setProdutoEmEdicao(null);
@@ -30,6 +36,9 @@ const ProdutosList = ({ produtos, fornecedores, recarregarDados }) => {
       setDescricao('');
       setPrecoVenda('');
       setQuantidadeEstoque('');
+      setQuantMax('');
+      setQuantMin('');
+      setDataValidade('');
       setIdFornecedor('');
     }
     setIsModalOpen(true);
@@ -37,6 +46,12 @@ const ProdutosList = ({ produtos, fornecedores, recarregarDados }) => {
 
   const fecharModal = () => setIsModalOpen(false);
 
+  const formatDateInput = (value) => {
+    if (!value) return '';
+    // se vier "2004-07-03T03:00:00.000Z"
+    return value.split('T')[0];
+  };
+  
   const handleDelete = async (id) => {
     if (window.confirm('Tem certeza que deseja excluir este produto?')) {
       try {
@@ -62,13 +77,17 @@ const ProdutosList = ({ produtos, fornecedores, recarregarDados }) => {
       descricao,
       preco_venda: parseFloat(precoVenda),
       quantidade_estoque: parseInt(quantidadeEstoque, 10),
+      quant_max: parseInt(quantMax),
+      quant_min: parseInt(quantMin),
+      data_validade: dataValidade,
       id_fornecedor: idFornecedor ? parseInt(idFornecedor, 10) : null,
     };
 
     const ehEdicao = !!produtoEmEdicao;
     const url = ehEdicao ? `${API_URL}/produtos/${produtoEmEdicao.id_produto}` : `${API_URL}/produtos`;
-    const method = ehEdicao ? 'PUT' : 'POST';
 
+    const method = ehEdicao ? 'PUT' : 'POST';
+    console.log(dadosProduto)
     try {
       const response = await fetch(url, {
         method,
@@ -90,6 +109,7 @@ const ProdutosList = ({ produtos, fornecedores, recarregarDados }) => {
   };
   
   // --- Renderização do Componente ---
+  console.log(produtos)
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -112,12 +132,18 @@ const ProdutosList = ({ produtos, fornecedores, recarregarDados }) => {
                   <td className="px-6 py-4">{produto.nome_fornecedor}</td>
                   <td className="px-6 py-4">R$ {parseFloat(produto.preco_venda).toFixed(2)}</td>
                   <td className="px-6 py-4">{produto.quantidade_estoque} un.</td>
+                  <td className="px-6 py-4">{produto.quant_max} un.</td>
+                  <td className="px-6 py-4">{produto.quant_min} un.</td>
+                  <td className="px-6 py-4">
+                    {new Date(produto.data_validade).toLocaleDateString("pt-BR")}
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex space-x-2">
                       <button onClick={() => abrirModal(produto)} className="text-blue-600 hover:text-blue-900"><Edit className="h-4 w-4" /></button>
                       <button onClick={() => handleDelete(produto.id_produto)} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   </td>
+                  
                 </tr>
               ))}
             </tbody>
@@ -136,6 +162,13 @@ const ProdutosList = ({ produtos, fornecedores, recarregarDados }) => {
               <div className="grid grid-cols-2 gap-4">
                 <input value={precoVenda} onChange={e => setPrecoVenda(e.target.value)} type="number" step="0.01" placeholder="Preço de Venda*" required className="w-full p-2 border rounded-md"/>
                 <input value={quantidadeEstoque} onChange={e => setQuantidadeEstoque(e.target.value)} type="number" placeholder="Estoque Inicial*" required className="w-full p-2 border rounded-md"/>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <input value={quantMax} onChange={e => setQuantMax(e.target.value)} type="number" step="0.01" placeholder="Quant. Max de estoque" required className="w-full p-2 border rounded-md"/>
+                <input value={quantMin} onChange={e => setQuantMin(e.target.value)} type="number" placeholder="Quant. Min de estoque" required className="w-full p-2 border rounded-md"/>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <input value={dataValidade} onChange={e => setDataValidade(e.target.value)} type="date" placeholder="Data de validade" required className="w-full p-2 border rounded-md"/>
               </div>
               <select value={idFornecedor} onChange={e => setIdFornecedor(e.target.value)} required className="w-full p-2 border rounded-md bg-white">
                 <option value="">Selecione um Fornecedor*</option>

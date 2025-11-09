@@ -1,64 +1,178 @@
-import React, { useState } from 'react';
-import { Plus, Eye, ShoppingCart, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { Plus, Edit, Loader2, Trash2 } from "lucide-react";
 
-const API_URL = 'http://localhost:3000';
+const API_URL = "http://localhost:3000";
 
 const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
-  // --- Estados do Componente ---
+  // --- Estados principais ---
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [vendaEmEdicao, setVendaEmEdicao] = useState(null);
 
-  // Estados para o formulário de nova venda
-  const [idCliente, setIdCliente] = useState('');
+  // Campos do formulário
+  const [idCliente, setIdCliente] = useState("");
   const [carrinho, setCarrinho] = useState([]);
-  const [produtoSelecionado, setProdutoSelecionado] = useState('');
+  const [produtoSelecionado, setProdutoSelecionado] = useState("");
   const [quantidadeProduto, setQuantidadeProduto] = useState(1);
+  const [estoqueDisponivel, setEstoqueDisponivel] = useState({});
 
-  // Estados para o modal de detalhes (Eye)
-  const [detalheAberto, setDetalheAberto] = useState(false);
-  const [vendaDetalhe, setVendaDetalhe] = useState(null);
-  const [detalheCarregando, setDetalheCarregando] = useState(false);
-  const [detalheErro, setDetalheErro] = useState('');
+  // Estados auxiliares
+  const [excluindoId, setExcluindoId] = useState(null);
 
-  // Helpers
+  // --- Utilitários ---
   const fmtBRL = (n) =>
-    Number(n ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    Number(n ?? 0).toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
 
-  // --- Ações: Nova Venda ---
+  const inicializarEstoque = () => {
+    const map = {};
+    produtos.forEach((p) => {
+      map[p.id_produto] = p.quantidade_estoque ?? 0;
+    });
+    return map;
+  };
+
+  // Recalcula estoque quando carrinho muda
+  useEffect(() => {
+    const base = inicializarEstoque();
+    carrinho.forEach((item) => {
+      if (base[item.id_produto] != null) {
+        base[item.id_produto] -= item.quantidade;
+      }
+    });
+    setEstoqueDisponivel(base);
+  }, [carrinho, produtos]);
+
+  // --- Abrir / Fechar Modal ---
   const abrirModal = () => {
-    // Reseta o formulário ao abrir
-    setIdCliente('');
+    setVendaEmEdicao(null);
+    setIdCliente("");
     setCarrinho([]);
-    setProdutoSelecionado('');
+    setProdutoSelecionado("");
     setQuantidadeProduto(1);
+    setEstoqueDisponivel(inicializarEstoque());
     setIsModalOpen(true);
   };
 
   const fecharModal = () => setIsModalOpen(false);
 
-  const adicionarAoCarrinho = () => {
-    if (!produtoSelecionado || quantidadeProduto <= 0) {
-      alert('Selecione um produto e uma quantidade válida.');
-      return;
-    }
-    const produtoNoBanco = produtos.find(
-      (p) => p.id_produto === parseInt(produtoSelecionado, 10)
-    );
-    if (produtoNoBanco) {
-      // Evita duplicatas
-      if (carrinho.some((item) => item.id_produto === produtoNoBanco.id_produto)) {
-        alert('Este produto já está no carrinho.');
-        return;
-      }
-      setCarrinho([
-        ...carrinho,
-        { ...produtoNoBanco, quantidade: parseInt(quantidadeProduto, 10) || 1 },
-      ]);
+  const abrirModalEdicao = async (id_venda) => {
+    try {
+      const resp = await fetch(`${API_URL}/vendas/${id_venda}`);
+      if (!resp.ok) throw new Error("Falha ao carregar venda para edição.");
+      const data = await resp.json();
+
+      setVendaEmEdicao(data);
+      setIdCliente(data.id_cliente?.toString() || "");
+
+      const itensCarrinho = (data.itens ?? []).map((it) => {
+        const prodInfo =
+          produtos.find((p) => p.id_produto === it.id_produto) || {};
+        return {
+          ...prodInfo,
+          id_produto: it.id_produto,
+          nome_produto: it.nome_produto,
+          quantidade: it.quantidade,
+        };
+      });
+      setCarrinho(itensCarrinho);
+      setEstoqueDisponivel(inicializarEstoque());
+      setProdutoSelecionado("");
+      setQuantidadeProduto(1);
+      setIsModalOpen(true);
+    } catch (e) {
+      console.log("Erro ao abrir venda para edição:", e);
+      alert("Erro ao abrir venda para edição.");
     }
   };
 
+  // --- Manipular Carrinho ---
+  const adicionarAoCarrinho = () => {
+    if (!produtoSelecionado || quantidadeProduto <= 0) {
+      alert("Selecione um produto e uma quantidade válida.");
+      return;
+    }
+
+    const idProd = parseInt(produtoSelecionado, 10);
+    const qtd = parseInt(quantidadeProduto, 10) || 1;
+    const produtoNoBanco = produtos.find((p) => p.id_produto === idProd);
+    if (!produtoNoBanco) {
+      alert("Produto inválido.");
+      return;
+    }
+
+    const disponivel =
+      estoqueDisponivel[idProd] ?? produtoNoBanco.quantidade_estoque ?? 0;
+
+    if (qtd > disponivel) {
+      alert(
+        `Quantidade solicitada (${qtd}) maior que o estoque disponível (${disponivel}).`
+      );
+      return;
+    }
+
+    setCarrinho((prev) => {
+      const idx = prev.findIndex((item) => item.id_produto === idProd);
+      if (idx === -1) {
+        return [...prev, { ...produtoNoBanco, quantidade: qtd }];
+      } else {
+        const novo = [...prev];
+        novo[idx] = {
+          ...novo[idx],
+          quantidade: novo[idx].quantidade + qtd,
+        };
+        return novo;
+      }
+    });
+
+    setProdutoSelecionado("");
+    setQuantidadeProduto(1);
+  };
+
+  const alterarQuantidadeItem = (id_produto, novaQtdBruta) => {
+    let novaQtd = parseInt(novaQtdBruta, 10);
+    if (Number.isNaN(novaQtd)) novaQtd = 0;
+
+    setCarrinho((prevCarrinho) => {
+      const item = prevCarrinho.find((i) => i.id_produto === id_produto);
+      if (!item) return prevCarrinho;
+
+      const qtdAntiga = item.quantidade;
+      if (novaQtd <= 0) {
+        return prevCarrinho.filter((i) => i.id_produto !== id_produto);
+      }
+
+      const dispAtual = estoqueDisponivel[id_produto] ?? 0;
+      const delta = novaQtd - qtdAntiga;
+
+      if (delta > dispAtual) {
+        alert(
+          `Quantidade máxima disponível é ${qtdAntiga + dispAtual}.`
+        );
+        return prevCarrinho;
+      }
+
+      return prevCarrinho.map((i) =>
+        i.id_produto === id_produto ? { ...i, quantidade: novaQtd } : i
+      );
+    });
+  };
+
+  const removerDoCarrinho = (id_produto) => {
+    setCarrinho((prev) => prev.filter((p) => p.id_produto !== id_produto));
+  };
+
+  const totalCarrinho = carrinho.reduce(
+    (acc, item) =>
+      acc + Number(item.preco_venda ?? 0) * Number(item.quantidade ?? 0),
+    0
+  );
+
+  // --- Finalizar venda ---
   const finalizarVenda = async () => {
     if (!idCliente || carrinho.length === 0) {
-      alert('Selecione um cliente e adicione pelo menos um produto ao carrinho.');
+      alert("Selecione um cliente e adicione pelo menos um produto.");
       return;
     }
 
@@ -70,64 +184,61 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
       })),
     };
 
+    const ehEdicao = !!vendaEmEdicao;
+    const url = ehEdicao
+      ? `${API_URL}/vendas/${vendaEmEdicao.id_venda}`
+      : `${API_URL}/vendas`;
+    const method = ehEdicao ? "PUT" : "POST";
+
     try {
-      const response = await fetch(`${API_URL}/vendas`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(dadosVenda),
       });
-
       if (response.ok) {
-        alert('Venda registrada com sucesso!');
+        alert(
+          `Venda ${ehEdicao ? "atualizada" : "registrada"} com sucesso!`
+        );
         fecharModal();
-        // Atualiza vendas e produtos (estoque)
         recarregarDados();
       } else {
         const erro = await response.json().catch(() => ({}));
-        alert(`Erro ao registrar venda: ${erro.detalhes || erro.erro || 'Falha desconhecida'}`);
+        alert(
+          `Erro ao ${ehEdicao ? "atualizar" : "registrar"}: ${
+            erro.detalhes || erro.erro || "Falha desconhecida"
+          }`
+        );
       }
     } catch (error) {
-      console.log('Não foi possível conectar à API: ', error);
-      alert('Não foi possível conectar à API.');
+      console.log("Erro ao salvar venda:", error);
     }
   };
 
-  // --- Ações: Detalhes da Venda (Eye) ---
-  const abrirDetalheVenda = async (id_venda) => {
-    setDetalheCarregando(true);
-    setDetalheErro('');
-    setVendaDetalhe(null);
-    setDetalheAberto(true);
+  // --- Excluir Venda ---
+  const excluirVenda = async (id_venda) => {
+    const confirmar = window.confirm(
+      `Excluir a venda #${id_venda}? Esta ação é irreversível.`
+    );
+    if (!confirmar) return;
 
     try {
-      const resp = await fetch(`${API_URL}/vendas/${id_venda}`);
-      if (!resp.ok) {
-        throw new Error('Falha ao carregar detalhes da venda.');
-      }
-      const data = await resp.json();
-
-      // Esperado algo como:
-      // {
-      //   id_venda, data_venda, valor_total,
-      //   cliente: { id_cliente, nome_cliente },
-      //   itens: [ { id_produto, nome_produto, quantidade, preco_unitario } ]
-      // }
-      setVendaDetalhe(data);
+      setExcluindoId(id_venda);
+      const resp = await fetch(`${API_URL}/vendas/${id_venda}`, {
+        method: "DELETE",
+      });
+      if (!resp.ok) throw new Error("Falha ao excluir venda.");
+      alert(`Venda #${id_venda} excluída com sucesso.`);
+      recarregarDados();
     } catch (e) {
-      setDetalheErro(e.message || 'Erro ao buscar detalhes.');
+      alert("Erro ao excluir venda.");
+      console.log(e);
     } finally {
-      setDetalheCarregando(false);
+      setExcluindoId(null);
     }
   };
 
-  const fecharDetalheVenda = () => {
-    setDetalheAberto(false);
-    setVendaDetalhe(null);
-    setDetalheErro('');
-    setDetalheCarregando(false);
-  };
-
-  // --- Render ---
+  // --- Renderização ---
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -141,80 +252,75 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
         </button>
       </div>
 
-      {/* Tabela de Vendas */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            {/* thead (adicione suas colunas) */}
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  ID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Cliente
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Data
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Total
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-
-            <tbody className="bg-white divide-y divide-gray-200">
-              {vendas.map((venda) => (
-                <tr key={venda.id_venda} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">#{venda.id_venda}</td>
-                  <td className="px-6 py-4">{venda.nome_cliente}</td>
-                  <td className="px-6 py-4">
-                    {venda.data_venda
-                      ? new Date(venda.data_venda).toLocaleString('pt-BR')
-                      : '-'}
-                  </td>
-                  <td className="px-6 py-4">
-                    {fmtBRL(parseFloat(venda.valor_total))}
-                  </td>
-                  <td className="px-6 py-4 text-right">
+      {/* --- Tabela de vendas --- */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {vendas.map((venda) => (
+              <tr key={venda.id_venda} className="hover:bg-gray-50">
+                <td className="px-6 py-4">#{venda.id_venda}</td>
+                <td className="px-6 py-4">{venda.nome_cliente}</td>
+                <td className="px-6 py-4">
+                  {venda.data_venda
+                    ? new Date(venda.data_venda).toLocaleString("pt-BR")
+                    : "-"}
+                </td>
+                <td className="px-6 py-4">
+                  {fmtBRL(parseFloat(venda.valor_total))}
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex justify-end items-center gap-2">
                     <button
-                      className="text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
-                      onClick={() => abrirDetalheVenda(venda.id_venda)}
-                      title="Ver detalhes"
+                      onClick={() => abrirModalEdicao(venda.id_venda)}
+                      className="text-indigo-600 hover:text-indigo-700"
+                      title="Editar"
                     >
-                      <Eye className="h-4 w-4" />
-                      <span className="sr-only">Ver detalhes</span>
+                      <Edit className="h-4 w-4" />
                     </button>
-                  </td>
-                </tr>
-              ))}
-
-              {vendas.length === 0 && (
-                <tr>
-                  <td colSpan="5" className="px-6 py-6 text-center text-gray-500">
-                    Nenhuma venda encontrada.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    <button
+                      onClick={() => excluirVenda(venda.id_venda)}
+                      className="text-red-600 hover:text-red-700"
+                      disabled={excluindoId === venda.id_venda}
+                      title="Excluir"
+                    >
+                      {excluindoId === venda.id_venda ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      {/* Modal de Nova Venda */}
+      {/* --- Modal --- */}
       {isModalOpen && (
         <div className="modal-overlay">
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold mb-4">Registrar Nova Venda</h2>
+          <div
+            className="modal-content max-w-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-2xl font-bold mb-4">
+              {vendaEmEdicao ? "Editar Venda" : "Nova Venda"}
+            </h2>
+
+            {/* Seleção de Cliente */}
             <div className="space-y-4">
-              {/* Seleção de Cliente */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cliente*
-                </label>
+                <label className="block text-sm font-medium mb-1">Cliente*</label>
                 <select
                   value={idCliente}
                   onChange={(e) => setIdCliente(e.target.value)}
@@ -230,33 +336,36 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
                 </select>
               </div>
 
-              {/* Adicionar Produtos ao Carrinho */}
+              {/* Adicionar Produto */}
               <div className="border-t pt-4">
-                <h3 className="text-lg font-medium text-gray-800 mb-2">
-                  Adicionar Produto ao Carrinho
-                </h3>
+                <h3 className="text-lg font-medium mb-2">Adicionar Produto</h3>
                 <div className="flex items-end gap-4">
                   <div className="flex-grow">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Produto*
-                    </label>
+                    <label className="block text-sm mb-1">Produto*</label>
                     <select
                       value={produtoSelecionado}
                       onChange={(e) => setProdutoSelecionado(e.target.value)}
                       className="w-full p-2 border rounded-md bg-white"
                     >
                       <option value="">Selecione um Produto</option>
-                      {produtos.map((p) => (
-                        <option key={p.id_produto} value={p.id_produto}>
-                          {p.nome_produto} (Est: {p.quantidade_estoque})
-                        </option>
-                      ))}
+                      {produtos.map((p) => {
+                        const disp =
+                          estoqueDisponivel[p.id_produto] ??
+                          p.quantidade_estoque;
+                        return (
+                          <option
+                            key={p.id_produto}
+                            value={p.id_produto}
+                            disabled={disp <= 0}
+                          >
+                            {p.nome_produto} (Est: {disp})
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Qtd*
-                    </label>
+                    <label className="block text-sm mb-1">Qtd*</label>
                     <input
                       value={quantidadeProduto}
                       onChange={(e) =>
@@ -270,149 +379,103 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
                   <button
                     type="button"
                     onClick={adicionarAoCarrinho}
-                    className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg"
+                    className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-lg"
                   >
                     Adicionar
                   </button>
                 </div>
               </div>
 
-              {/* Itens no Carrinho */}
+              {/* Carrinho */}
               <div className="border-t pt-4">
-                <h3 className="text-lg font-medium text-gray-800 mb-2">Carrinho</h3>
-                <div className="space-y-2">
-                  {carrinho.length === 0 ? (
-                    <p className="text-gray-500">O carrinho está vazio.</p>
-                  ) : (
-                    carrinho.map((item) => (
-                      <div
-                        key={item.id_produto}
-                        className="flex justify-between items-center bg-gray-100 p-2 rounded-md"
-                      >
-                        <span>{item.nome_produto}</span>
-                        <span>{item.quantidade} un.</span>
-                      </div>
-                    ))
-                  )}
-                </div>
+                <h3 className="text-lg font-medium mb-2">Carrinho</h3>
+
+                {carrinho.length === 0 ? (
+                  <p className="text-gray-500">O carrinho está vazio.</p>
+                ) : (
+                  <div className="bg-white border rounded-md overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="text-left px-3 py-2">Produto</th>
+                          <th className="text-right px-3 py-2">Qtd</th>
+                          <th className="text-right px-3 py-2">Preço</th>
+                          <th className="text-right px-3 py-2">Subtotal</th>
+                          <th className="text-right px-3 py-2">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {carrinho.map((item) => {
+                          const subtotal =
+                            Number(item.preco_venda ?? 0) *
+                            Number(item.quantidade ?? 0);
+                          return (
+                            <tr key={item.id_produto} className="border-t">
+                              <td className="px-3 py-2">
+                                {item.nome_produto}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  className="w-16 p-1 border rounded-md text-right"
+                                  value={item.quantidade}
+                                  onChange={(e) =>
+                                    alterarQuantidadeItem(
+                                      item.id_produto,
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {fmtBRL(item.preco_venda)}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {fmtBRL(subtotal)}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                <button
+                                  onClick={() =>
+                                    removerDoCarrinho(item.id_produto)
+                                  }
+                                  className="text-red-600 hover:text-red-800 text-xs"
+                                >
+                                  Remover
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
-              <div className="flex justify-end space-x-4 pt-6">
-                <button
-                  type="button"
-                  onClick={fecharModal}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={finalizarVenda}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
-                >
-                  Finalizar Venda
-                </button>
+              {/* Total + Botões */}
+              <div className="flex justify-between items-center pt-6">
+                <div className="text-lg font-semibold">
+                  Total: {fmtBRL(totalCarrinho)}
+                </div>
+                <div className="flex space-x-4">
+                  <button
+                    type="button"
+                    onClick={fecharModal}
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={finalizarVenda}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
+                  >
+                    {vendaEmEdicao ? "Salvar Alterações" : "Finalizar Venda"}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Detalhes da Venda (Eye) */}
-      {detalheAberto && (
-        <div className="modal-overlay" onClick={fecharDetalheVenda}>
-          <div
-            className="modal-content max-w-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold">
-                {vendaDetalhe
-                  ? `Detalhes da Venda #${vendaDetalhe.id_venda}`
-                  : 'Detalhes da Venda'}
-              </h2>
-              <button
-                className="px-3 py-1 rounded-md bg-gray-200 hover:bg-gray-300 text-gray-800"
-                onClick={fecharDetalheVenda}
-              >
-                Fechar
-              </button>
-            </div>
-
-            {detalheCarregando && (
-              <div className="flex items-center gap-2 text-gray-600">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Carregando detalhes...
-              </div>
-            )}
-
-            {detalheErro && (
-              <div className="text-red-600 text-sm">{detalheErro}</div>
-            )}
-
-            {!detalheCarregando && !detalheErro && vendaDetalhe && (
-              <>
-                <div className="space-y-1 text-sm text-gray-700 mb-4">
-                  <div>
-                    <strong>Cliente:</strong>{' '}
-                    {vendaDetalhe.nome_cliente ?? '-'}
-                  </div>
-                  <div>
-                    <strong>Data:</strong>{' '}
-                    {vendaDetalhe.data_venda
-                      ? new Date(vendaDetalhe.data_venda).toLocaleString('pt-BR')
-                      : '-'}
-                  </div>
-                </div>
-
-                <div className="bg-white border rounded-md overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="text-left px-3 py-2">Produto</th>
-                        <th className="text-right px-3 py-2">Qtd</th>
-                        <th className="text-right px-3 py-2">Preço</th>
-                        <th className="text-right px-3 py-2">Subtotal</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(vendaDetalhe.itens ?? []).map((it) => {
-                        const subtotal =
-                          Number(it.preco_unitario ?? 0) *
-                          Number(it.quantidade ?? 0);
-                        return (
-                          <tr key={it.id_produto} className="border-t">
-                            <td className="px-3 py-2">
-                              {it.nome_produto ?? `#${it.id_produto}`}
-                            </td>
-                            <td className="px-3 py-2 text-right">
-                              {it.quantidade}
-                            </td>
-                            <td className="px-3 py-2 text-right">
-                              {fmtBRL(it.preco_unitario)}
-                            </td>
-                            <td className="px-3 py-2 text-right">
-                              {fmtBRL(subtotal)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="flex justify-end mt-4 text-base">
-                  <span className="font-semibold">
-                    Total:&nbsp;{fmtBRL(vendaDetalhe.valor_total)}
-                  </span>
-                </div>
-
-                <div className="flex justify-end gap-3 mt-6">
-                  {/* Ex.: botão para imprimir/recibo, se desejar */}
-                  {/* <button className="px-4 py-2 rounded-lg bg-blue-600 text-white">Imprimir</button> */}
-                </div>
-              </>
-            )}
           </div>
         </div>
       )}
