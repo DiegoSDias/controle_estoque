@@ -4,21 +4,26 @@ import { Plus, Edit, Loader2, Trash2 } from "lucide-react";
 const API_URL = "http://localhost:3000";
 
 const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
-  // --- Estados principais ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [vendaEmEdicao, setVendaEmEdicao] = useState(null);
 
-  // Campos do formulário
   const [idCliente, setIdCliente] = useState("");
   const [carrinho, setCarrinho] = useState([]);
   const [produtoSelecionado, setProdutoSelecionado] = useState("");
   const [quantidadeProduto, setQuantidadeProduto] = useState(1);
   const [estoqueDisponivel, setEstoqueDisponivel] = useState({});
+  const [itensOriginais, setItensOriginais] = useState([]);
 
-  // Estados auxiliares
   const [excluindoId, setExcluindoId] = useState(null);
 
-  // --- Utilitários ---
+  // Devolução
+  const [isModalDevolucaoOpen, setIsModalDevolucaoOpen] = useState(false);
+  const [itemDevolucao, setItemDevolucao] = useState(null);
+  const [devQuantidade, setDevQuantidade] = useState(1);
+  const [devMotivo, setDevMotivo] = useState("");
+  const [devReutilizavel, setDevReutilizavel] = useState(true);
+  const [devCarregando, setDevCarregando] = useState(false);
+
   const fmtBRL = (n) =>
     Number(n ?? 0).toLocaleString("pt-BR", {
       style: "currency",
@@ -33,22 +38,32 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
     return map;
   };
 
-  // Recalcula estoque quando carrinho muda
+  // Estoque visível
   useEffect(() => {
     const base = inicializarEstoque();
+
+    if (vendaEmEdicao && itensOriginais.length > 0) {
+      itensOriginais.forEach((item) => {
+        if (base[item.id_produto] != null) {
+          base[item.id_produto] += item.quantidade;
+        }
+      });
+    }
+
     carrinho.forEach((item) => {
       if (base[item.id_produto] != null) {
         base[item.id_produto] -= item.quantidade;
       }
     });
-    setEstoqueDisponivel(base);
-  }, [carrinho, produtos]);
 
-  // --- Abrir / Fechar Modal ---
+    setEstoqueDisponivel(base);
+  }, [carrinho, produtos, vendaEmEdicao, itensOriginais]);
+
   const abrirModal = () => {
     setVendaEmEdicao(null);
     setIdCliente("");
     setCarrinho([]);
+    setItensOriginais([]);
     setProdutoSelecionado("");
     setQuantidadeProduto(1);
     setEstoqueDisponivel(inicializarEstoque());
@@ -74,10 +89,12 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
           id_produto: it.id_produto,
           nome_produto: it.nome_produto,
           quantidade: it.quantidade,
+          id_item_venda: it.id_item_venda,
         };
       });
+
       setCarrinho(itensCarrinho);
-      setEstoqueDisponivel(inicializarEstoque());
+      setItensOriginais(itensCarrinho);
       setProdutoSelecionado("");
       setQuantidadeProduto(1);
       setIsModalOpen(true);
@@ -87,7 +104,6 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
     }
   };
 
-  // --- Manipular Carrinho ---
   const adicionarAoCarrinho = () => {
     if (!produtoSelecionado || quantidadeProduto <= 0) {
       alert("Selecione um produto e uma quantidade válida.");
@@ -130,37 +146,79 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
     setQuantidadeProduto(1);
   };
 
-  const alterarQuantidadeItem = (id_produto, novaQtdBruta) => {
-    let novaQtd = parseInt(novaQtdBruta, 10);
-    if (Number.isNaN(novaQtd)) novaQtd = 0;
-
-    setCarrinho((prevCarrinho) => {
-      const item = prevCarrinho.find((i) => i.id_produto === id_produto);
-      if (!item) return prevCarrinho;
-
-      const qtdAntiga = item.quantidade;
-      if (novaQtd <= 0) {
-        return prevCarrinho.filter((i) => i.id_produto !== id_produto);
-      }
-
-      const dispAtual = estoqueDisponivel[id_produto] ?? 0;
-      const delta = novaQtd - qtdAntiga;
-
-      if (delta > dispAtual) {
-        alert(
-          `Quantidade máxima disponível é ${qtdAntiga + dispAtual}.`
-        );
-        return prevCarrinho;
-      }
-
-      return prevCarrinho.map((i) =>
-        i.id_produto === id_produto ? { ...i, quantidade: novaQtd } : i
-      );
-    });
-  };
-
+  // quantidade no carrinho agora é fixa (sem input)
   const removerDoCarrinho = (id_produto) => {
     setCarrinho((prev) => prev.filter((p) => p.id_produto !== id_produto));
+  };
+
+  const handleClickRemover = (item) => {
+    if (!vendaEmEdicao || !item.id_item_venda) {
+      removerDoCarrinho(item.id_produto);
+      return;
+    }
+
+    setItemDevolucao(item);
+    setDevQuantidade(item.quantidade);
+    setDevMotivo("");
+    setDevReutilizavel(true);
+    setIsModalDevolucaoOpen(true);
+  };
+
+  const confirmarDevolucao = async () => {
+    if (!itemDevolucao) return;
+
+    const qtd = parseInt(devQuantidade, 10);
+    if (!qtd || qtd <= 0) {
+      alert("Informe uma quantidade válida para devolução.");
+      return;
+    }
+    if (qtd > itemDevolucao.quantidade) {
+      alert(`Você só pode devolver até ${itemDevolucao.quantidade} unidades.`);
+      return;
+    }
+
+    try {
+      setDevCarregando(true);
+
+      const response = await fetch(`${API_URL}/devolucoes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id_item_venda: itemDevolucao.id_item_venda,
+          quantidade: qtd,
+          motivo: devMotivo,
+          reutilizavel: devReutilizavel,
+        }),
+      });
+
+      if (!response.ok) {
+        const erro = await response.json().catch(() => ({}));
+        alert(
+          `Erro ao registrar devolução: ${
+            erro.detalhes || erro.erro || "Falha desconhecida"
+          }`
+        );
+        return;
+      }
+
+      // Atualiza carrinho no front: diminui ou remove
+      setCarrinho((prev) =>
+        prev.flatMap((i) => {
+          if (i.id_produto !== itemDevolucao.id_produto) return [i];
+          const novaQtd = i.quantidade - qtd;
+          return novaQtd > 0 ? [{ ...i, quantidade: novaQtd }] : [];
+        })
+      );
+
+      alert("Devolução registrada com sucesso.");
+      setIsModalDevolucaoOpen(false);
+      setItemDevolucao(null);
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao registrar devolução.");
+    } finally {
+      setDevCarregando(false);
+    }
   };
 
   const totalCarrinho = carrinho.reduce(
@@ -169,7 +227,6 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
     0
   );
 
-  // --- Finalizar venda ---
   const finalizarVenda = async () => {
     if (!idCliente || carrinho.length === 0) {
       alert("Selecione um cliente e adicione pelo menos um produto.");
@@ -205,9 +262,9 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
       } else {
         const erro = await response.json().catch(() => ({}));
         alert(
-          `Erro ao ${ehEdicao ? "atualizar" : "registrar"}: ${
-            erro.detalhes || erro.erro || "Falha desconhecida"
-          }`
+          `Erro ao ${
+            ehEdicao ? "atualizar" : "registrar"
+          }: ${erro.detalhes || erro.erro || "Falha desconhecida"}`
         );
       }
     } catch (error) {
@@ -215,7 +272,6 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
     }
   };
 
-  // --- Excluir Venda ---
   const excluirVenda = async (id_venda) => {
     const confirmar = window.confirm(
       `Excluir a venda #${id_venda}? Esta ação é irreversível.`
@@ -238,7 +294,6 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
     }
   };
 
-  // --- Renderização ---
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -252,16 +307,26 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
         </button>
       </div>
 
-      {/* --- Tabela de vendas --- */}
+      {/* Tabela de vendas */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                ID
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Cliente
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Data
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Total
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                Ações
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -306,7 +371,7 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
         </table>
       </div>
 
-      {/* --- Modal --- */}
+      {/* Modal de venda */}
       {isModalOpen && (
         <div className="modal-overlay">
           <div
@@ -317,10 +382,11 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
               {vendaEmEdicao ? "Editar Venda" : "Nova Venda"}
             </h2>
 
-            {/* Seleção de Cliente */}
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Cliente*</label>
+                <label className="block text-sm font-medium mb-1">
+                  Cliente*
+                </label>
                 <select
                   value={idCliente}
                   onChange={(e) => setIdCliente(e.target.value)}
@@ -336,7 +402,6 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
                 </select>
               </div>
 
-              {/* Adicionar Produto */}
               <div className="border-t pt-4">
                 <h3 className="text-lg font-medium mb-2">Adicionar Produto</h3>
                 <div className="flex items-end gap-4">
@@ -386,7 +451,6 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
                 </div>
               </div>
 
-              {/* Carrinho */}
               <div className="border-t pt-4">
                 <h3 className="text-lg font-medium mb-2">Carrinho</h3>
 
@@ -415,18 +479,7 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
                                 {item.nome_produto}
                               </td>
                               <td className="px-3 py-2 text-right">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  className="w-16 p-1 border rounded-md text-right"
-                                  value={item.quantidade}
-                                  onChange={(e) =>
-                                    alterarQuantidadeItem(
-                                      item.id_produto,
-                                      e.target.value
-                                    )
-                                  }
-                                />
+                                {item.quantidade}
                               </td>
                               <td className="px-3 py-2 text-right">
                                 {fmtBRL(item.preco_venda)}
@@ -436,12 +489,10 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
                               </td>
                               <td className="px-3 py-2 text-right">
                                 <button
-                                  onClick={() =>
-                                    removerDoCarrinho(item.id_produto)
-                                  }
+                                  onClick={() => handleClickRemover(item)}
                                   className="text-red-600 hover:text-red-800 text-xs"
                                 >
-                                  Remover
+                                  Devolver Item
                                 </button>
                               </td>
                             </tr>
@@ -453,7 +504,6 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
                 )}
               </div>
 
-              {/* Total + Botões */}
               <div className="flex justify-between items-center pt-6">
                 <div className="text-lg font-semibold">
                   Total: {fmtBRL(totalCarrinho)}
@@ -475,6 +525,95 @@ const VendasList = ({ vendas, clientes, produtos, recarregarDados }) => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Devolução */}
+      {isModalDevolucaoOpen && itemDevolucao && (
+        <div
+          className="modal-overlay"
+          onClick={() => !devCarregando && setIsModalDevolucaoOpen(false)}
+        >
+          <div
+            className="modal-content max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold mb-4">Devolução de item</h2>
+
+            <p className="text-sm text-gray-700 mb-2">
+              Produto: <strong>{itemDevolucao.nome_produto}</strong>
+            </p>
+            <p className="text-sm text-gray-600 mb-4">
+              Quantidade na venda: {itemDevolucao.quantidade}
+            </p>
+
+            <div className="mb-3">
+              <label className="block text-sm font-medium mb-1">
+                Quantidade a devolver
+              </label>
+              <input
+                type="number"
+                min="1"
+                max={itemDevolucao.quantidade}
+                value={devQuantidade}
+                onChange={(e) => setDevQuantidade(e.target.value)}
+                className="w-full p-2 border rounded-md"
+              />
+            </div>
+
+            <div className="mb-3">
+              <label className="block text-sm font-medium mb-1">
+                Motivo (opcional)
+              </label>
+              <textarea
+                value={devMotivo}
+                onChange={(e) => setDevMotivo(e.target.value)}
+                className="w-full p-2 border rounded-md"
+                rows={3}
+                placeholder="Ex: produto danificado, erro no pedido..."
+              />
+            </div>
+
+            <div className="mb-4 flex items-center gap-2">
+              <input
+                id="devReutilizavel"
+                type="checkbox"
+                checked={devReutilizavel}
+                onChange={(e) => setDevReutilizavel(e.target.checked)}
+                className="h-4 w-4"
+              />
+              <label
+                htmlFor="devReutilizavel"
+                className="text-sm text-gray-700"
+              >
+                Item pode voltar para o estoque (reutilizável)
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  !devCarregando && setIsModalDevolucaoOpen(false)
+                }
+                className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg"
+                disabled={devCarregando}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarDevolucao}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+                disabled={devCarregando}
+              >
+                {devCarregando && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                Confirmar devolução
+              </button>
             </div>
           </div>
         </div>
