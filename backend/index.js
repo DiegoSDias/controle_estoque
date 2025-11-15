@@ -9,6 +9,8 @@ const fornecedoresRoutes = require('./routes/fornecedores');
 const produtosRoutes = require('./routes/produtos');
 const clientesRoutes = require('./routes/clientes');
 const vendasRoutes = require('./routes/vendas');
+const dashboardRoutes = require('./routes/dashboard.js');
+const devolucaoRoutes = require('./routes/devolucoes.js');
 
 
 // Middleware essencial para o Express entender JSON
@@ -26,6 +28,8 @@ app.use('/fornecedores', fornecedoresRoutes);
 app.use('/produtos', produtosRoutes);
 app.use('/clientes', clientesRoutes);
 app.use('/vendas', vendasRoutes);
+app.use('/dashboard', dashboardRoutes);
+app.use('/devolucoes', devolucaoRoutes);
 
 
 // Inicia o servidor e o faz "escutar" na porta definida

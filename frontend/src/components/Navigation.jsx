@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, Users, Truck, ShoppingCart, BarChart3 } from 'lucide-react';
+import { Package, Users, Truck, ShoppingCart, BarChart3, PackageX } from 'lucide-react';
 
 const Navigation = ({ activeTab, setActiveTab }) => {
   const navItems = [
@@ -7,7 +7,8 @@ const Navigation = ({ activeTab, setActiveTab }) => {
     { id: 'produtos', label: 'Produtos', icon: Package },
     { id: 'fornecedores', label: 'Fornecedores', icon: Truck },
     { id: 'clientes', label: 'Clientes', icon: Users },
-    { id: 'vendas', label: 'Vendas', icon: ShoppingCart }
+    { id: 'vendas', label: 'Vendas', icon: ShoppingCart },
+    { id: 'devolucoes', label: 'Devoluções', icon: PackageX },
   ];
 
   return (
