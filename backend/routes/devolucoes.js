@@ -1,3 +1,4 @@
+// backend/routes/devolucoes.js
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
@@ -10,15 +11,19 @@ router.post('/', async (req, res) => {
     const { id_item_venda, quantidade, motivo, reutilizavel } = req.body;
 
     if (!id_item_venda || !quantidade) {
-      return res.status(400).json({ erro: 'id_item_venda e quantidade são obrigatórios.' });
+      return res
+        .status(400)
+        .json({ erro: 'id_item_venda e quantidade são obrigatórios.' });
     }
 
     const qtd = parseInt(quantidade, 10);
     if (!qtd || qtd <= 0) {
-      return res.status(400).json({ erro: 'Quantidade deve ser maior que zero.' });
+      return res
+        .status(400)
+        .json({ erro: 'Quantidade deve ser maior que zero.' });
     }
 
-    // Confere se o item existe e pega a quantidade ATUAL (já descontada por devoluções anteriores)
+    // Confere se o item existe e pega a quantidade ATUAL (já ajustada pelas devoluções anteriores)
     const [itens] = await connection.query(
       'SELECT quantidade FROM ItensVenda WHERE id_item_venda = ?',
       [id_item_venda]
@@ -29,14 +34,13 @@ router.post('/', async (req, res) => {
 
     const quantidadeRestante = itens[0].quantidade; // quantidade que ainda está na venda
 
-    // Agora só precisa garantir que não está devolvendo mais do que o que ainda existe na venda
     if (qtd > quantidadeRestante) {
       return res.status(400).json({
-        erro: `Quantidade de devolução excede a quantidade restante na venda. Restante: ${quantidadeRestante}`
+        erro: `Quantidade de devolução excede a quantidade restante na venda. Restante: ${quantidadeRestante}`,
       });
     }
 
-    // Insere devolução (trigger vai ajustar ItensVenda e o estoque)
+    // Insere devolução (trigger ajusta ItensVenda, estoque e a venda)
     const sql = `
       INSERT INTO Devolucao (data_devolucao, motivo, quantidade, reutilizavel, id_item_venda)
       VALUES (NOW(), ?, ?, ?, ?)
@@ -45,48 +49,38 @@ router.post('/', async (req, res) => {
       motivo || null,
       qtd,
       !!reutilizavel,
-      id_item_venda
+      id_item_venda,
     ]);
 
     res.status(201).json({
       message: 'Devolução registrada com sucesso.',
-      id_devolucao: result.insertId
+      id_devolucao: result.insertId,
     });
-
   } catch (erro) {
     console.error(erro);
-    res.status(500).json({ erro: 'Erro ao registrar devolução.', detalhes: erro.message });
+    res.status(500).json({
+      erro: 'Erro ao registrar devolução.',
+      detalhes: erro.message,
+    });
   } finally {
     connection.release();
   }
 });
 
-// GET /devolucoes
+/**
+ * @route   GET /devolucoes
+ * @desc    Busca todos os detalhes de devoluções usando a VIEW
+ */
 router.get('/', async (req, res) => {
   try {
-    const sql = `
-      SELECT 
-        d.id_devolucao,
-        d.data_devolucao,
-        d.motivo,
-        d.quantidade,
-        d.reutilizavel,
-        iv.id_item_venda,
-        v.id_venda,
-        c.nome_cliente,
-        p.nome_produto
-      FROM Devolucao d
-      JOIN ItensVenda iv ON d.id_item_venda = iv.id_item_venda
-      JOIN Vendas v ON iv.id_venda = v.id_venda
-      JOIN Clientes c ON v.id_cliente = c.id_cliente
-      JOIN Produtos p ON iv.id_produto = p.id_produto
-      ORDER BY d.data_devolucao DESC
-    `;
-    const [rows] = await pool.promise().query(sql);
+    const query = `SELECT * FROM vw_devolucoes_detalhes ORDER BY data_devolucao DESC`;
+    const [rows] = await pool.promise().query(query);
     res.json(rows);
-  } catch (erro) {
-    console.error(erro);
-    res.status(500).json({ erro: 'Erro ao listar devoluções.' });
+  } catch (error) {
+    console.error('Erro ao buscar devoluções:', error);
+    res
+      .status(500)
+      .json({ message: 'Erro ao conectar ao banco de dados.' });
   }
 });
 

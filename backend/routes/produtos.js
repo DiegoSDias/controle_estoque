@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router(); // Usamos o Router do Express
 const pool = require('../config/database'); // Importamos nossa conexão do BD
 
+// GET - Buscar todos os produtos (Modificado para incluir categoria)
 router.get('/', (req, res) => {
   const sql = `
     SELECT p.*, f.nome_fantasia as nome_fornecedor 
@@ -19,7 +20,7 @@ router.get('/', (req, res) => {
   });
 });
 
-// GET - Buscar produto por ID
+// GET - Buscar produto por ID (Modificado para incluir categoria)
 router.get('/:id', (req, res) => {
   const { id } = req.params;
   const sql = `
@@ -41,16 +42,18 @@ router.get('/:id', (req, res) => {
   });
 });
 
-// POST - Cadastrar produto
+// POST - Cadastrar produto (Modificado para incluir categoria)
 router.post('/', (req, res) => {
-  const { nome_produto, descricao, preco_venda, quantidade_estoque, quant_max, quant_min, data_validade, id_fornecedor } = req.body;
+  // Adicionado 'categoria'
+  const { nome_produto, descricao, preco_venda, quantidade_estoque, quant_max, quant_min, data_validade, id_fornecedor, categoria } = req.body;
   
   if (!nome_produto || !preco_venda) {
     return res.status(400).json({ erro: "Nome do produto e preço de venda são obrigatórios" });
   }
   
-  const sql = "INSERT INTO Produtos (nome_produto, descricao, preco_venda, quantidade_estoque, quant_max, quant_min, data_validade, id_fornecedor) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-  const dados = [nome_produto, descricao, preco_venda, quantidade_estoque || 0, quant_max, quant_min, data_validade, id_fornecedor];
+  const sql = "INSERT INTO Produtos (nome_produto, descricao, preco_venda, quantidade_estoque, quant_max, quant_min, data_validade, id_fornecedor, categoria) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  // Adicionado 'categoria'
+  const dados = [nome_produto, descricao, preco_venda, quantidade_estoque || 0, quant_max, quant_min, data_validade || null, id_fornecedor, categoria || 'Outros'];
   
   pool.query(sql, dados, (erro, resultados) => {
     if (erro) {
@@ -64,18 +67,54 @@ router.post('/', (req, res) => {
   });
 });
 
-// PUT - Atualizar produto
+// PUT - Atualizar produto (=== CORRIGIDO E ATUALIZADO ===)
 router.put('/:id', (req, res) => {
   const { id } = req.params;
-  console.log(req.body)
-  const { nome_produto, descricao, preco_venda, quantidade_estoque, id_fornecedor } = req.body;
   
-  if (!nome_produto || !preco_venda) {
-    return res.status(400).json({ erro: "Nome do produto e preço de venda são obrigatórios" });
+  // 1. Pega TODOS os campos do formulário
+  const { 
+    nome_produto, 
+    descricao, 
+    preco_venda, 
+    quantidade_estoque, 
+    quant_max, 
+    quant_min, 
+    data_validade, 
+    id_fornecedor,
+    categoria // Adicionado 'categoria'
+  } = req.body;
+  
+  if (!nome_produto || !preco_venda || !quant_max || !quant_min) {
+    return res.status(400).json({ erro: "Nome, preço e quantidades max/min são obrigatórios" });
   }
   
-  const sql = "UPDATE Produtos SET nome_produto = ?, descricao = ?, preco_venda = ?, quantidade_estoque = ?, id_fornecedor = ? WHERE id_produto = ?";
-  const dados = [nome_produto, descricao, preco_venda, quantidade_estoque, id_fornecedor, id];
+  // 2. SQL atualizado para TODOS os campos
+  const sql = `
+    UPDATE Produtos SET 
+      nome_produto = ?, 
+      descricao = ?, 
+      preco_venda = ?, 
+      quantidade_estoque = ?, 
+      quant_max = ?, 
+      quant_min = ?, 
+      data_validade = ?, 
+      id_fornecedor = ?,
+      categoria = ?
+    WHERE id_produto = ?`;
+    
+  // 3. Array 'dados' atualizado com TODOS os campos
+  const dados = [
+    nome_produto, 
+    descricao, 
+    preco_venda, 
+    quantidade_estoque, 
+    quant_max, 
+    quant_min, 
+    data_validade, 
+    id_fornecedor,
+    categoria || 'Outros',
+    id
+  ];
   
   pool.query(sql, dados, (erro, resultados) => {
     if (erro) {
@@ -89,7 +128,7 @@ router.put('/:id', (req, res) => {
   });
 });
 
-// DELETE - Excluir produto
+// DELETE - Excluir produto (Seu código original, sem alterações)
 router.delete('/:id', (req, res) => {
   const { id } = req.params;
   const sql = "DELETE FROM Produtos WHERE id_produto = ?";

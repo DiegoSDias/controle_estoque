@@ -109,6 +109,69 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
     }
   };
 
+  const formatarCnpj = (value) => {
+    value = value.replace(/\D/g, ""); // remove não números
+
+    // Limita a 14 dígitos
+    value = value.slice(0, 14);
+
+    if (value.length <= 2) return value;
+    if (value.length <= 5) return value.replace(/(\d{2})(\d+)/, "$1.$2");
+    if (value.length <= 8) return value.replace(/(\d{2})(\d{3})(\d+)/, "$1.$2.$3");
+    if (value.length <= 12)
+      return value.replace(/(\d{2})(\d{3})(\d{3})(\d+)/, "$1.$2.$3/$4");
+
+    return value.replace(
+      /(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,
+      "$1.$2.$3/$4-$5"
+    );
+  };
+
+  const formatarTelefone = (value) => {
+    value = value.replace(/\D/g, "");
+
+    if (value.length <= 2) return `(${value}`;
+    if (value.length <= 6) return `(${value.slice(0, 2)}) ${value.slice(2)}`;
+    if (value.length <= 10)
+      return `(${value.slice(0, 2)}) ${value.slice(2, 6)}-${value.slice(6)}`;
+
+    return `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7, 11)}`;
+  };
+
+  
+  const buscarCep = async (valorCep) => {
+    const cepLimpo = valorCep.replace(/\D/g, '');
+
+    if (cepLimpo.length !== 8) return; // só busca com 8 dígitos
+
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+      const data = await response.json();
+
+      if (data.erro) {
+        alert("CEP não encontrado.");
+        return;
+      }
+
+      setNomeRua(data.logradouro || "");
+      setBairro(data.bairro || "");
+      setCidade(data.localidade || "");
+      setEstado(data.uf || "");
+    } catch (error) {
+      console.log("Erro ao consultar CEP:", error);
+      alert("Erro ao consultar CEP.");
+    }
+  };
+  const formatarCep = (valor) => {
+    const apenasNumeros = valor.replace(/\D/g, "").slice(0, 8); // máximo 8 dígitos
+
+    if (apenasNumeros.length <= 5) {
+      return apenasNumeros;
+    }
+
+    return `${apenasNumeros.slice(0, 5)}-${apenasNumeros.slice(5)}`;
+  };
+
   // --- Renderização do Componente ---
   return (
     <div className="space-y-6">
@@ -142,6 +205,7 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
         ))}
       </div>
 
+
       {/* Modal de Cadastro/Edição */}
       {isModalOpen && (
         <div className="modal-overlay" onClick={fecharModal}>
@@ -169,15 +233,16 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
 
                 <input
                   value={cnpj}
-                  onChange={(e) => setCnpj(e.target.value)}
+                  onChange={(e) => setCnpj(formatarCnpj(e.target.value))}
                   type="text"
                   placeholder="CNPJ"
+                  maxLength={18}
                   className="p-2 border rounded-md"
                 />
 
                 <input
                   value={telefone}
-                  onChange={(e) => setTelefone(e.target.value)}
+                  onChange={(e) => setTelefone(formatarTelefone(e.target.value))}
                   type="text"
                   placeholder="Telefone"
                   className="p-2 border rounded-md"
@@ -192,6 +257,19 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
                 />
 
                 {/* Endereço */}
+                <input
+                  value={formatarCep(cep)}
+                  onChange={(e) => {
+                    const valor = e.target.value.replace(/\D/g, '').slice(0, 8);
+                    setCep(valor);
+
+                    if (valor.length === 8) buscarCep(valor);
+                  }}
+                  type="text"
+                  placeholder="CEP"
+                  className="p-2 border rounded-md"
+                />
+
                 <input
                   value={nomeRua}
                   onChange={(e) => setNomeRua(e.target.value)}
@@ -238,14 +316,6 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
                   type="text"
                   placeholder="Estado (UF)"
                   maxLength={2}
-                  className="p-2 border rounded-md"
-                />
-
-                <input
-                  value={cep}
-                  onChange={(e) => setCep(e.target.value)}
-                  type="text"
-                  placeholder="CEP"
                   className="p-2 border rounded-md"
                 />
               </div>

@@ -127,6 +127,68 @@ const [cep, setCep] = useState('');
     }
   };
 
+  const formatarCpf = (value) => {
+    value = value.replace(/\D/g, ""); // remove tudo que não é número
+
+    // Limita a 11 dígitos
+    value = value.slice(0, 11);
+
+    if (value.length <= 3) return value;
+    if (value.length <= 6) return value.replace(/(\d{3})(\d+)/, "$1.$2");
+    if (value.length <= 9)
+      return value.replace(/(\d{3})(\d{3})(\d+)/, "$1.$2.$3");
+
+    return value.replace(
+      /(\d{3})(\d{3})(\d{3})(\d{2})/,
+      "$1.$2.$3-$4"
+    );
+  };
+
+  const formatarTelefone = (value) => {
+    value = value.replace(/\D/g, "");
+
+    if (value.length <= 2) return `(${value}`;
+    if (value.length <= 6) return `(${value.slice(0, 2)}) ${value.slice(2)}`;
+    if (value.length <= 10)
+      return `(${value.slice(0, 2)}) ${value.slice(2, 6)}-${value.slice(6)}`;
+
+    return `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7, 11)}`;
+  };
+
+  const buscarCep = async (valorCep) => {
+    const cepLimpo = valorCep.replace(/\D/g, '');
+
+    if (cepLimpo.length !== 8) return; // só busca com 8 dígitos
+
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
+      const data = await response.json();
+
+      if (data.erro) {
+        alert("CEP não encontrado.");
+        return;
+      }
+
+      setNomeRua(data.logradouro || "");
+      setBairro(data.bairro || "");
+      setCidade(data.localidade || "");
+      setEstado(data.uf || "");
+    } catch (error) {
+      console.log("Erro ao consultar CEP:", error);
+      alert("Erro ao consultar CEP.");
+    }
+  };
+
+  const formatarCep = (valor) => {
+    const apenasNumeros = valor.replace(/\D/g, "").slice(0, 8); // máximo 8 dígitos
+
+    if (apenasNumeros.length <= 5) {
+      return apenasNumeros;
+    }
+
+    return `${apenasNumeros.slice(0, 5)}-${apenasNumeros.slice(5)}`;
+  };
+
   // --- Renderização do Componente ---
   return (
     <div className="space-y-6">
@@ -178,15 +240,16 @@ const [cep, setCep] = useState('');
 
                 <input
                   value={cpf}
-                  onChange={(e) => setCpf(e.target.value)}
+                  onChange={(e) => setCpf(formatarCpf(e.target.value))}
                   type="text"
                   placeholder="CPF"
+                  maxLength={14}
                   className="p-2 border rounded-md"
                 />
 
                 <input
                   value={telefone}
-                  onChange={(e) => setTelefone(e.target.value)}
+                  onChange={(e) => setTelefone(formatarTelefone(e.target.value))}
                   type="text"
                   placeholder="Telefone"
                   className="p-2 border rounded-md"
@@ -210,6 +273,18 @@ const [cep, setCep] = useState('');
                 />
 
                 {/* Endereço */}
+                <input
+                  value={formatarCep(cep)}
+                  onChange={(e) => {
+                    const valor = e.target.value.replace(/\D/g, '').slice(0, 8);
+                    setCep(valor);
+
+                    if (valor.length === 8) buscarCep(valor);
+                  }}
+                  type="text"
+                  placeholder="CEP"
+                  className="p-2 border rounded-md md:col-span-2"
+                />
                 <input
                   value={nomeRua}
                   onChange={(e) => setNomeRua(e.target.value)}
@@ -256,14 +331,6 @@ const [cep, setCep] = useState('');
                   type="text"
                   placeholder="UF"
                   maxLength={2}
-                  className="p-2 border rounded-md"
-                />
-
-                <input
-                  value={cep}
-                  onChange={(e) => setCep(e.target.value)}
-                  type="text"
-                  placeholder="CEP"
                   className="p-2 border rounded-md"
                 />
               </div>

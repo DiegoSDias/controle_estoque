@@ -7,7 +7,9 @@ const pool = mysql.createPool({
   database: process.env.DB_DATABASE,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  charset: 'utf8mb4',
+  collation: 'utf8mb4_0900_ai_ci'
 });
 
 module.exports = pool;
