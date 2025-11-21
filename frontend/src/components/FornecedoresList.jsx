@@ -1,13 +1,16 @@
-import { useState } from 'react';
-import { Plus, Truck, Edit, Trash2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Plus, Truck, Edit, Trash2, Search } from 'lucide-react'; // NOVO: Search + useMemo
 
-// API_URL para centralizar o endereço do back-end
 const API_URL = 'http://localhost:3000';
 
 const FornecedoresList = ({ fornecedores, recarregarDados }) => {
   // --- Estados do Componente ---
-  const [isModalOpen, setIsModalOpen] = useState(false); // controla a visibilidade do modal
-  const [fornecedorEmEdicao, setFornecedorEmEdicao] = useState(null); // guarda o fornecedor que está sendo editado
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [fornecedorEmEdicao, setFornecedorEmEdicao] = useState(null);
+
+  // Estado da busca  -------------------------------------- NOVO
+  const [busca, setBusca] = useState('');
+  // -------------------------------------------------------------
 
   // Estados para os campos do formulário
   const [nomeFantasia, setNomeFantasia] = useState('');
@@ -23,11 +26,8 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
   const [estado, setEstado] = useState('');
   const [cep, setCep] = useState('');
 
-  // --- Funções de Ação ---
-
   const abrirModal = (fornecedor = null) => {
     if (fornecedor) {
-      // Modo Edição: preenche o formulário com os dados existentes
       setFornecedorEmEdicao(fornecedor);
       setNomeFantasia(fornecedor.nome_fantasia);
       setRazaoSocial(fornecedor.razao_social || '');
@@ -42,7 +42,6 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
       setEstado(fornecedor.estado || '');
       setCep(fornecedor.cep || '');
     } else {
-      // Modo Cadastro: limpa o formulário
       setFornecedorEmEdicao(null);
       setNomeFantasia('');
       setRazaoSocial('');
@@ -70,7 +69,7 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
         const response = await fetch(`${API_URL}/fornecedores/${id}`, { method: 'DELETE' });
         if (response.ok) {
           alert('Fornecedor excluído com sucesso!');
-          recarregarDados(); // Recarrega a lista
+          recarregarDados();
         } else {
           const erro = await response.json();
           alert(`Erro ao excluir: ${erro.erro}`);
@@ -83,10 +82,26 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    
-    const dadosFornecedor = { nome_fantasia: nomeFantasia, razao_social: razaoSocial, cnpj, email, telefone, nome_rua: nomeRua, numero_rua:numeroRua, complemento, bairro, cidade, estado, cep };
+
+    const dadosFornecedor = {
+      nome_fantasia: nomeFantasia,
+      razao_social: razaoSocial,
+      cnpj,
+      email,
+      telefone,
+      nome_rua: nomeRua,
+      numero_rua: numeroRua,
+      complemento,
+      bairro,
+      cidade,
+      estado,
+      cep
+    };
+
     const ehEdicao = !!fornecedorEmEdicao;
-    const url = ehEdicao ? `${API_URL}/fornecedores/${fornecedorEmEdicao.id_fornecedor}` : `${API_URL}/fornecedores`;
+    const url = ehEdicao
+      ? `${API_URL}/fornecedores/${fornecedorEmEdicao.id_fornecedor}`
+      : `${API_URL}/fornecedores`;
     const method = ehEdicao ? 'PUT' : 'POST';
 
     try {
@@ -110,9 +125,7 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
   };
 
   const formatarCnpj = (value) => {
-    value = value.replace(/\D/g, ""); // remove não números
-
-    // Limita a 14 dígitos
+    value = value.replace(/\D/g, "");
     value = value.slice(0, 14);
 
     if (value.length <= 2) return value;
@@ -138,11 +151,10 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
     return `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7, 11)}`;
   };
 
-  
   const buscarCep = async (valorCep) => {
     const cepLimpo = valorCep.replace(/\D/g, '');
 
-    if (cepLimpo.length !== 8) return; // só busca com 8 dígitos
+    if (cepLimpo.length !== 8) return;
 
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
@@ -162,8 +174,9 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
       alert("Erro ao consultar CEP.");
     }
   };
+
   const formatarCep = (valor) => {
-    const apenasNumeros = valor.replace(/\D/g, "").slice(0, 8); // máximo 8 dígitos
+    const apenasNumeros = valor.replace(/\D/g, "").slice(0, 8);
 
     if (apenasNumeros.length <= 5) {
       return apenasNumeros;
@@ -172,48 +185,117 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
     return `${apenasNumeros.slice(0, 5)}-${apenasNumeros.slice(5)}`;
   };
 
-  // --- Renderização do Componente ---
+  // -------- FILTRO DE FORNECEDORES (USANDO A BARRA DE BUSCA) -------- NOVO
+  const fornecedoresFiltrados = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (!termo) return fornecedores;
+
+    return fornecedores.filter((f) => {
+      const nomeFantasia = (f.nome_fantasia || '').toLowerCase();
+      const razao = (f.razao_social || '').toLowerCase();
+      const cnpj = (f.cnpj || '').toLowerCase();
+      const tel = (f.telefone || '').toLowerCase();
+      const cid = (f.cidade || '').toLowerCase();
+      const uf = (f.estado || '').toLowerCase();
+
+      return (
+        nomeFantasia.includes(termo) ||
+        razao.includes(termo) ||
+        cnpj.includes(termo) ||
+        tel.includes(termo) ||
+        cid.includes(termo) ||
+        uf.includes(termo)
+      );
+    });
+  }, [busca, fornecedores]);
+  // -------------------------------------------------------------------
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* Cabeçalho + Barra de busca */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <h2 className="text-2xl font-bold text-gray-900">Fornecedores</h2>
-        <button onClick={() => abrirModal()} className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg flex items-center transition-colors">
-          <Plus className="h-5 w-5 mr-2" />
-          Novo Fornecedor
-        </button>
+
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          {/* Input de busca */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por nome, CNPJ, cidade..."
+              className="pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+
+          <button
+            onClick={() => abrirModal()}
+            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg flex items-center justify-center transition-colors"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Novo Fornecedor
+          </button>
+        </div>
       </div>
 
       {/* Cards dos Fornecedores */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {fornecedores.map((fornecedor) => (
-          <div key={fornecedor.id_fornecedor} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-blue-500 rounded-lg p-3">
-                <Truck className="h-6 w-6 text-white" />
+      {fornecedoresFiltrados.length === 0 ? (
+        <p className="text-sm text-gray-500">
+          Nenhum fornecedor encontrado para &quot;{busca}&quot;.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {fornecedoresFiltrados.map((fornecedor) => (
+            <div
+              key={fornecedor.id_fornecedor}
+              className="bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="bg-blue-500 rounded-lg p-3">
+                  <Truck className="h-6 w-6 text-white" />
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => abrirModal(fornecedor)}
+                    className="text-blue-600 hover:text-blue-900"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(fornecedor.id_fornecedor)}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-              <div className="flex space-x-2">
-                <button onClick={() => abrirModal(fornecedor)} className="text-blue-600 hover:text-blue-900"><Edit className="h-4 w-4" /></button>
-                <button onClick={() => handleDelete(fornecedor.id_fornecedor)} className="text-red-600 hover:text-red-900"><Trash2 className="h-4 w-4" /></button>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                {fornecedor.nome_fantasia}
+              </h3>
+              <div className="space-y-1 text-sm text-gray-500">
+                <p>CNPJ: {fornecedor.cnpj}</p>
+                <p>Telefone: {fornecedor.telefone}</p>
+                {fornecedor.cidade && fornecedor.estado && (
+                  <p>
+                    {fornecedor.cidade} - {fornecedor.estado}
+                  </p>
+                )}
               </div>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">{fornecedor.nome_fantasia}</h3>
-            <div className="space-y-1 text-sm text-gray-500">
-              <p>CNPJ: {fornecedor.cnpj}</p>
-              <p>Telefone: {fornecedor.telefone}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
+          ))}
+        </div>
+      )}
 
       {/* Modal de Cadastro/Edição */}
       {isModalOpen && (
         <div className="modal-overlay" onClick={fecharModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold mb-4">{fornecedorEmEdicao ? 'Editar Fornecedor' : 'Novo Fornecedor'}</h2>
+            <h2 className="text-2xl font-bold mb-4">
+              {fornecedorEmEdicao ? 'Editar Fornecedor' : 'Novo Fornecedor'}
+            </h2>
             <form onSubmit={handleSubmit}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Dados principais */}
                 <input
                   value={nomeFantasia}
                   onChange={(e) => setNomeFantasia(e.target.value)}
@@ -256,7 +338,6 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
                   className="p-2 border rounded-md md:col-span-2"
                 />
 
-                {/* Endereço */}
                 <input
                   value={formatarCep(cep)}
                   onChange={(e) => {
@@ -321,8 +402,19 @@ const FornecedoresList = ({ fornecedores, recarregarDados }) => {
               </div>
 
               <div className="flex justify-end space-x-4 mt-6">
-                <button type="button" onClick={fecharModal} className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg">Cancelar</button>
-                <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">Salvar</button>
+                <button
+                  type="button"
+                  onClick={fecharModal}
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+                >
+                  Salvar
+                </button>
               </div>
             </form>
           </div>
